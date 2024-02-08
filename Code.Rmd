@@ -1,0 +1,408 @@
+---
+title: "MA334_ 2212231"
+author: "Opeyemi Latona"
+date: "2023-04-22"
+output: html_document
+---
+
+### INTRODUCTION 
+
+The biodiversity of an ecosystem is a fundamental aspect of its health and resilience. In this report, we explore the biodiversity of seven taxonomic groups, including birds, bees, butterflies, carabids, diptera, homoptera, and hymenoptera. We use descriptive statistics to compare the levels of biodiversity among these groups and examine the relationship between the diversity of these groups and their geographic coordinates. Additionally, we perform hypothesis tests to determine whether there have been significant changes in biodiversity over time and investigate the relationship between biodiversity and ecological status using linear regression.
+
+### MEHTOD
+The methodology used in this report involves exploratory data analysis, hypothesis testing, and linear regression analysis to investigate the relationship between biodiversity and ecological status.
+Firstly, descriptive statistics were generated to explore the biodiversity levels of seven taxonomic groups, as well as the skewness and variability of the data within each group. Correlation coefficients were calculated to determine the relationship between Easting and Northing coordinates and the biodiversity of the seven taxa.
+Next, hypothesis testing was performed to examine the change in biodiversity over time and the relationship between two biodiversity measures. A one-way t-test was used to determine if there was a significant change in the ecological status of BD7 between the Y00 and Y70 periods. The Kolmogorov-Smirnov test was used to test for significant differences in the distribution of BD7 and BD11.
+Finally, linear regression models were used to investigate the relationship between biodiversity and ecological status. Simple linear regression was used to determine the relationship between BD7 and BD11. Multiple linear regression was used to investigate the relationship between ecological status and BD7 for the Y70 period and for the Y00 period  and of the variables and the proportional species richness values.
+
+
+
+
+### RESULT
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, echo = FALSE)
+```
+
+
+```{r}
+if(!is.null(dev.list())) dev.off()  # clear out the past 
+rm(list = ls())
+cat("\014")
+library(dplyr) # provides a set of functions for data manipulation.
+library(tidyr) # for spliting on the period see below
+library(moments) # for calculating moments for skewness etc.
+library(reshape2) #  provides functions for data reshaping.
+par(mfrow=c(1, 1)) # sets the graphical parameters for any plots to be created,
+setwd("C:/Users/USER/Desktop/MA334/Materials")
+Proj_data <-  read.csv("proportional_species_richness_V3.csv")
+head(Proj_data, n = 3)
+```
+ ## LOAD DATA: 
+ 
+ The list of Biodiveristy alloted to me
+ 
+```{r include=FALSE}
+Proj_data$period <- as.factor(Proj_data$period) # must set categorical vars
+Proj_data$dominantLandClass <- as.factor(Proj_data$dominantLandClass)
+names(Proj_data)
+```
+
+```{r}
+# you can select in some way, for example....
+Proj_data<- Proj_data%>%filter(grepl("TM",Location))
+```
+
+
+```{r}
+# select  7 randomly chosen predictors to form the trial eco_stat
+# note that you must keep to your allocated 7 (see the Moodle spreadsheet)
+all <- c(2:12)
+eco_selected <- sample(all,size=7, replace = FALSE)
+eco_selected <- c(3,2,5,6,7,8,12)   # a particular troublesome case
+eco_not_selected <- all[!(all%in%eco_selected)]
+eco_names <- names(Proj_data[,2:12])
+eco_selected_names <- names(Proj_data)[eco_selected]
+eco_selected_names
+```
+
+
+```{r include=FALSE}
+# calculate the bio div measure over 7 taxinomic groups
+mean_selected <- rowMeans(Proj_data[,eco_selected],na.rm=TRUE) # mean the 7 columns 
+sum(is.na(mean_selected)) # check that there are no NAs in mean_selected
+# add in the biodiversity measure which is the mean over 7 taxonomic groups
+Proj_data_MA334 <- Proj_data%>%mutate(eco_status_7=mean_selected)
+
+```
+
+##### 1 Data Exploration
+1a 
+Based on the descriptive statistics presented in the table, it can concluded that the bird taxonomic group has the highest level of biodiversity among the seven groups, while the bee taxonomic group has the lowest level. The Butterflies group has the most skewed distribution of data, while the Carabids group has the least skewed distribution. The variability of data within each group varies, with the bees group having the largest standard deviation and the butterflies group having the smallest.
+```{r}
+# the data exploration phase (only some suggested approaches)
+
+# you could split the data by period and compare these stats before and after 
+table <- data.frame()
+for(i in eco_selected){
+  table <- rbind(table,
+                 c(eco_names[i-1],
+                   round(mean(Proj_data_MA334[,i],na.rm = TRUE),digits = 2),
+                   round(sd(Proj_data_MA334[,i],na.rm = TRUE),digits = 2),
+                   round(skewness(Proj_data_MA334[,i],na.rm = TRUE),digits = 2)
+                 ))}
+colnames(table) <- c("taxi_group","mean","sd","skewness")
+table%>%arrange(sd,skewness) # something more could be done here
+```
+```{r}
+# extend data exploration; with correlations between continuous variables
+cont_vars <- Proj_data_MA334%>%select(c(eco_selected,13,14)) # includes easting and northing 
+```
+
+
+```{r include=FALSE}
+cormat <- round(x = cor(cont_vars, use = "pairwise.complete.obs"), digits = 2)
+# Melt the correlation matrix and show the first 8 rows
+melt(cormat) %>% 
+  mutate(R2 = value^2) %>% 
+  arrange(value) %>% 
+  slice_head(n = 8)
+  
+melt(cormat) %>% 
+  mutate(R2 = value^2) %>% 
+  arrange(Var1, value) %>% 
+  slice_head(n = 8)
+
+```
+
+###### 1b 
+
+Easting and Northing
+The correlation coefficient between Easting and the seven taxonomies was calculated to be 0.2635128. This value indicates a weak positive correlation between Easting and the seven taxonomies; though it is positive, it means that the variables move in the same direction. In this case, as Easting increases, the seven taxonomies also tend to increase, although the relationship is weak.The correlation coefficient value of -0.3452376 suggests a moderately negative correlation between the Northing coordinate and the diversity of the seven taxa. This means that as the Northing coordinate increases, the diversity of these taxa decreases. The magnitude of the correlation coefficient indicates that this relationship is not very strong but still statistically significant.
+This is shown in the figure below
+
+```{r figures-side, fig.show="hold", out.width="32%"}
+plot(cont_vars$Northing~cont_vars$Easting) # a map appears !!!
+# now use the eastings and northings (these may be better used as predictors )
+
+plot(Proj_data_MA334$eco_status_7~Proj_data_MA334$Easting)
+cor(Proj_data_MA334$eco_status_7,Proj_data_MA334$Easting)
+plot(Proj_data_MA334$eco_status_7~Proj_data_MA334$Northing)  # for BD7
+cor(Proj_data_MA334$eco_status_7,Proj_data_MA334$Northing)
+
+```
+
+
+```{r, fig.show="hold", out.width="50%"}
+# Perform linear regression using Northing as predictor
+lin_mod <- lm(eco_status_7 ~ Northing, data = Proj_data_MA334)
+# Get summary of the linear model
+summary(lin_mod)
+# Create scatterplot of residuals vs fitted values
+plot(jitter(fitted(lin_mod)), residuals(lin_mod), xlab = "Fitted", ylab = "Residuals")
+abline(h = 0)
+# Create normal Q-Q plot of model residuals
+qqnorm(lin_mod$residuals)
+qqline(lin_mod$residuals, col = "red")
+```
+
+The box plot comparism shows that there is a significant change in the eco status of BD7 from the period of Y00 to the period of Y70. This can be seen from the median value of each Y00 and Y70.
+
+```{r  width= 50}
+# box plot comparisons for the two periods ignoring all other varaibles 
+eco_status <- Proj_data_MA334%>%pull(eco_status_7)
+eco_period <- Proj_data_MA334%>%pull(period)
+plot(eco_status~eco_period)
+```
+
+### Hypothesis tests
+2a) One-way Test
+The one-way test done to check the change in the biodiversity of BD7 between Y00 and Y70 shows that there is a significant change in the eco-status of BD7.The t-test result shows that the t-value is -6.1351, with a p-value of 2.326e-07, which is less than the standard alpha level of 0.05, indicating that we can reject the null hypothesis that the true mean is equal to 0. This suggests that there is a statistically significant difference between the mean values of BD7_change and 0. The 95% confidence interval is between -0.02845299 and -0.01437486, which means we can be 95% confident that the true population mean lies within this interval. This indicates that the change in ecological status from Y00 to Y70 is likely to be negative, with a mean change of approximately -0.021.
+```{r, figures3, fig.show="hold", out.width="30%"}
+Proj_data_MA334_period <- Proj_data_MA334%>%select(Location,period,eco_status_7)
+Proj_data_MA334_split <- Proj_data_MA334_period%>%pivot_wider(names_from =period,values_from=eco_status_7)
+Proj_data_MA334_split <- Proj_data_MA334_split%>%mutate(BD7_change=Y00-Y70)
+head(Proj_data_MA334_split)
+hist(Proj_data_MA334_split$BD7_change)  # the distribution of the BD7 change 
+BD7_change <- Proj_data_MA334_split%>%pull(BD7_change)
+t.test(BD7_change,mu=0)  # t test with H0: mu=0
+
+```
+
+
+
+```{r include=FALSE}
+# explicit calculation for the same t test (check this carefully,  don't put into the assignment)
+s_mean <- mean(BD7_change)
+s_sd <- sd(BD7_change)
+sample_size <- length(BD7_change)
+t_value <- s_mean/(s_sd/sqrt(sample_size )) # calculate the t statistic 
+t_value
+2*pt(-abs(t_value),sample_size-1) # calculate the two tail probability for t_value
+```
+
+ 2b) 
+The Kolmogorov-Smirnov test (KS test)
+The KS test performed on the taxonomic group BD7 in relation to BD11 shows that there is no significant change in the biodiversity of BD7 and BD11. The test resulted in a test statistic of 0.090909 and a p-value of 0.8631. Since the p-value is greater than the significance level of 0.05, it fails to reject the null hypothesis, and we conclude that there is no significant difference between the distribution of BD7 and BD11. Therefore, we can say that there is no significant relationship between the variables BD7 and BD11 in terms of their ecological status.
+
+```{r, figures4, fig.show="hold", out.width="30%"}
+# comparing the two distributions of bio div based on 7 and 11 taxonomic groups 
+par(mfrow=c(1, 1))  # divide graph area in 1 columns
+qqplot(Proj_data_MA334$eco_status_7,Proj_data_MA334$ecologicalStatus)
+abline(0,1,col="red")
+# both cdfs together  and do a kolmogorov test H0: distributions are the same
+BD7_cdf <- ecdf(Proj_data_MA334$eco_status_7)
+BD11_cdf <- ecdf(Proj_data_MA334$ecologicalStatus)
+plot(BD11_cdf,col="red")
+lines(BD7_cdf,col="green")
+ks.test(Proj_data_MA334$eco_status_7,Proj_data_MA334$ecologicalStatus)
+```
+
+### 3 Simple linear regression
+
+3a) Linear Regression of BD7 against BD11 
+
+The linear regression shows the relationship between BD7 and BD11. From the summary of the lm, the estimated regression equation is presented as:BD7 = -0.1261 + 1.1916*BD11.since the dependent variable is BD7 and the independent variable is BD11.The coefficients of the regression equation are statistically significant, as evidenced by the t-values and corresponding p-values. The intercept is -0.1261 with a standard error of 0.0190 and a t-value of -6.638. The p-value of 2.72e-09 indicates that the intercept is significantly different from zero. The slope coefficient for BD11 is 1.1916, with a standard error of 0.0284 and a t-value of 41.965. The p-value of < 2e-16 indicates that the slope coefficient is also significantly different from zero. In conclusion, the linear regression model suggests that there is a strong positive relationship between BD11 and BD7. For every unit increase in BD11, BD7 is expected to increase by 1.1916 units while holding all other factors constant.
+
+```{r, figures5, fig.show="hold", out.width="30%"}
+# Simple linear regression part of the specified assignment
+# regressions of eco_status_7 against ecologicalstatus based on all 11
+plot(Proj_data_MA334$eco_status_7~Proj_data_MA334$ecologicalStatus)
+abline(0,1,col="red")
+lin_mod <- lm(Proj_data_MA334$eco_status_7~Proj_data_MA334$ecologicalStatus)
+summary(lin_mod)
+abline(lin_mod,col="green")
+plot(jitter(fitted(lin_mod)),residuals(lin_mod),xlab="Fitted",ylab="Residuals")
+abline(h=0,col="blue")
+qqnorm(residuals(lin_mod))
+qqline(residuals(lin_mod),col="red")
+
+```
+
+
+ 3b. Linear regression model of BD7 over the period Y70
+The linear regression model shows that there is a strong positive relationship between biodiversity BD7 and ecological status for the period Y70. The coefficient estimate for the ecological status predictor variable is 1.26073, indicating that for every one-unit increase in ecological status, there is an estimated increase of 1.26073 in BD7. The intercept estimate is -0.16562, which represents the expected value of BD7 when the ecological status is zero. The p-value for the F-statistic is less than 2.2e-16, indicating that the model is statistically significant and that the predictor variable has a significant impact on the response variable. The multiple R-squared value of 0.9478 suggests that the model explains a large proportion of the variance in BD7, and the adjusted R-squared value of 0.9466 suggests that the model is a good fit for the data.
+```{r}
+# linear model of BD7 against Y70 
+Proj_data_MA334_Y70 <- Proj_data_MA334%>%filter(period=="Y70")
+lin_mody70 <- lm(Proj_data_MA334_Y70$eco_status_7~Proj_data_MA334_Y70$ecologicalStatus)
+lin_mod$coefficients
+```
+
+ 3c : Linear regression of BD7 over the period Y00
+The lm model for biodiversity BD7 over the period Y00 shows a strong positive relationship between BD7 and ecological status. The coefficient of the ecological status variable is estimated at 1.13757, which implies that a one-unit increase in ecological status is associated with a 1.13757 increase in BD7. The p-value for the coefficient is very small (< 2e-16), indicating that the coefficient is statistically significant. The intercept of the model is estimated at -0.09708, which represents the predicted value of BD7 when the ecological status is zero. However, since ecological status is a continuous variable, the intercept may not be meaningful in practice. The multiple R-squared of the model is 0.9786, which indicates that the model explains a significant portion of the variation in BD7.
+```{r}
+Proj_data_MA334_Y00 <- Proj_data_MA334%>%filter(period=="Y00")
+lin_mod <- lm(Proj_data_MA334_Y00$eco_status_7~Proj_data_MA334_Y00$ecologicalStatus)
+lin_mod$coefficients
+```
+
+
+### 4 Multiple linear regression
+
+4a  
+
+The Calculate mean of the proportional species richness values for these remaining four taxonomic groups : 
+
+Mean of BD4 = 0.6639664
+```{r fig.height=50, fig.width=30}
+# linear regression of BD4 on BD7 
+mean_selected <- rowMeans(Proj_data[,eco_not_selected ],na.rm=TRUE) # mean the rem 4 columns 
+BD4_mean <- mean(mean_selected) 
+BD4_mean # print out mean of the remaining 4 column
+sum(is.na(mean_selected)) # check that there are no NAs in mean_selected
+# add in the biodiversity measure which is the mean over 7 taxonomic groups
+Proj_data_MA334 <- Proj_data_MA334%>%mutate(eco_status_4=mean_selected)
+```
+```{r, figures6, fig.show="hold", out.width="30%"}
+# regressions of means: eco_status_4 against others not inc eco_status_4 data
+plot(Proj_data_MA334$eco_status_4~Proj_data_MA334$eco_status_7)
+abline(0,1,col="red")
+lin_mod <- lm(Proj_data_MA334$eco_status_4~Proj_data_MA334$eco_status_7)
+summary(lin_mod)
+abline(lin_mod,col="green")
+plot(jitter(fitted(lin_mod)),residuals(lin_mod),xlab="Fitted",ylab="Residuals")
+abline(h=0,col="blue")
+qqnorm(residuals(lin_mod))
+qqline(residuals(lin_mod),col="red")
+```
+### 4: multiple linear regression
+4b.  Multiple linear regression BD4 against the selected 7 
+
+The final model is a linear regression model with BD4 (eco_status_4) as the response variable and Birds, Bees, Butterflies, Isopods, Hoverflies, Carabids, and vascular plants as the predictor variables. The coefficients of the regression model show the relationship between each predictor variable and the response variable.
+
+BD4 = 0.29952 + 0.29585 * Bird + 0.02096 * Bees + 0.02458 * Butterflies + 0.17659 * Carabids - 0.14142 * Hoverflies - 0.08732 * Isopods + 0.12214 * Vascular_plants
+
+The intercept of the model is 0.29952, which means that if all the predictor variables are equal to zero, the BD4 would be 0.29952.
+The coefficient for birds is 0.29585, which means that for every one-unit increase in the number of birds, the BD4 will increase by 0.29585 units, holding all other predictor variables constant.
+The coefficient for bees is 0.02096, which means that for every one-unit increase in the number of bees, the BD4 will increase by 0.02096 units, holding all other predictor variables constant. However, the p-value for bees is not significant (p=0.220930), indicating that this variable may not be a significant predictor of BD4.
+The coefficient for butterflies is 0.02458, which means that for every one-unit increase in the number of butterflies, the BD4 will increase by 0.02458 units, holding all other predictor variables constant. However, the p-value for butterflies is not significant (p=0.782405), indicating that this variable may not be a significant predictor of BD4.
+The coefficient for Carabids is 0.17659, which means that for every one-unit increase in the number of Carabids, the BD4 will increase by 0.17659 units, holding all other predictor variables constant.
+The coefficient for hoverflies is -0.14142, which means that for every one-unit increase in the number of hoverflies, the BD4 will decrease by 0.14142 units, holding all other predictor variables constant.
+The coefficient for isopods is -0.08732, which means that for every one-unit increase in the number of isopods, the BD4 will decrease by 0.08732 units, holding all other predictor variables constant.
+The coefficient for vascular plants is 0.12214, which means that for every one-unit increase in the number of vascular plants, the BD4 will increase by 0.12214 units, holding all other predictor variables constant.
+The adjusted R-squared value of the model is 0.812, which means that approximately 81.2% of the variation in BD4 can be explained by the predictor variables in the model. The F-statistic is significant (p < 2.2e-16), indicating that the overall model is a good fit for the data.
+
+
+```{r, figures7, fig.show="hold", out.width="30%"}
+# Create Training and Test data 
+set.seed(123) # for reproducibility
+trainingRowIndex <- sample(1:nrow(Proj_data_MA334), 0.8*nrow(Proj_data_MA334))  # row indices for 80% training data
+trainingData <- Proj_data_MA334[trainingRowIndex, ]  # model training data
+testData  <- Proj_data_MA334[-trainingRowIndex, ] %>% na.omit() # for test data remove NAs 
+
+# Build the model on training data
+lmMod_train <- lm(eco_status_4 ~ ., 
+                  data = trainingData[c("eco_status_4", eco_selected_names)],
+                  na.action = na.omit, y = TRUE)
+summary(lmMod_train)  # model summary
+cor(lmMod_train$fitted.values, lmMod_train$y) # cor training data 
+Eco_4_Pred <- predict(lmMod_train, testData) # predict to check model on test Data
+cor(Eco_4_Pred, testData$eco_status_4)
+plot(Eco_4_Pred ~ testData$eco_status_4)
+abline(0, 1, col = "red")
+
+# mis_fit_to_testData are the residuals for the train model fit to the test data 
+mis_fit_to_testData <- testData$eco_status_4 - Eco_4_Pred
+plot(mis_fit_to_testData ~ Eco_4_Pred) # look for unwanted pattern in residuals
+abline(0, 0, col = "red")
+qqnorm(mis_fit_to_testData) # check for normality of residuals in prediction
+qqline(mis_fit_to_testData, col = "red")
+
+```
+
+###  Multiple linear regression BD7 against period, easting and northing
+This linear model relates the variable eco_status_7 to the independent variables period, Easting, and Northing . The estimated regression equation is:
+eco_status_7 = -0.1941 + 0.02141 * periodY70 + 1.917e-06 * Easting - 1.322e-06*Northing
+This shows that:
+Holding all other variables constant, for each unit increase in periodY70, there is an expected increase of 0.02141 in eco_status_7. However, the coefficient is only marginally significant with a p-value of 0.0841. 
+Also,holding all other variables constant, for each unit increase in Easting, there is an expected increase of 1.917e-06 in eco_status_7. The coefficient is statistically significant with a p-value of 1.69e-05. 
+Holding all other variables constant, for each unit increase in Northing, there is an expected decrease of 1.322e-06 in eco_status_7.
+The coefficient is statistically significant with a p-value of 1.44e-06.
+
+```{r,figures8, fig.show="hold", out.width="30%" }
+
+# multiple linear regression BD7 against period, easting and northing 
+mult_lin_mod <- lm(eco_status_7~.,
+                   data=Proj_data_MA334[c("eco_status_7",
+                                          "period","Easting","Northing")],
+                   na.action = na.omit,y=TRUE)
+summary(mult_lin_mod)
+plot(mult_lin_mod$fitted.values~mult_lin_mod$y)
+abline(0,1,col="red")
+plot(jitter(fitted(mult_lin_mod)),residuals(mult_lin_mod),xlab="Fitted",ylab="Residuals")
+abline(h=0,col="blue")
+qqnorm(residuals(mult_lin_mod))
+qqline(residuals(mult_lin_mod),col="red")
+```
+
+
+
+```{r, figures9, fig.show="hold", out.width="30%"}
+# compare the effect of each significant coefficient to that of period
+mult_lin_mod$coefficients
+as.numeric(mult_lin_mod$coefficients[3])*mean(Proj_data_MA334$Easting)
+as.numeric(mult_lin_mod$coefficients[4])*mean(Proj_data_MA334$Northing)
+
+# The following PCA method is an extension to the set book 
+# PCA for visualizing the multi-dimensional spread of biodiversity values #######################
+
+table(Proj_data_MA334_Y70$period); table(Proj_data_MA334_Y00$period) # check that these separate periods 
+table(Proj_data_MA334_Y00$Location==Proj_data_MA334_Y70$Location) # check that Locations correspond between the two periods
+
+eco_difference <- Proj_data_MA334_Y00[,eco_selected ]-Proj_data_MA334_Y70[,eco_selected ] # general differences between the two periods 
+head(eco_difference)
+```
+
+
+```{r, figures10, fig.show="hold", out.width="50%"}
+# see ?prcomp the default here is the mean correct but not to scale 
+pr.out=prcomp(na.omit(eco_difference)) # Principal Components 
+pr.out$center  # gives the mean corrections the "centers"
+pr.out$scale  # not scaled
+pr.out$rotation[,1:2] # print out first two principal axes
+screeplot(pr.out, type="lines") # plot the variances in decreasing order
+plot(pr.out$x[,1],pr.out$x[,2]) # scatter plot for first two principal components
+text(pr.out$x[,1],pr.out$x[,2], Proj_data_MA334_Y00$dominantLandClass, cex=0.5, pos=4, col="red") # location labels
+
+```
+
+### Open Analysis
+
+The results of a principal component analysis (PCA) of the differences in biodiversity variables between the periods Y00 and Y70. The values under each biodiversity variable represent the loading or contribution of that variable to the first two principal components, PC1 and PC2. The values under PC1 and PC2 are the coefficients that describe the linear combination of the original variables that make up each principal component.
+From the output, we can infer the following: Bees have a high positive loading (0.84) on PC1, while Carabids have a high negative loading (-0.49) on PC1. This indicates that Bees have a strong positive correlation with PC1, while Carabids have a strong negative correlation with PC1.
+Similarly, Isopods have a high positive loading (0.43) on PC2, while Hoverflies have a high negative loading (-0.10) on PC2. This indicates that Isopods have a strong positive correlation with PC2, while Hoverflies have a strong negative correlation with PC2.
+
+Overall, the analysis helps us understand how the variables are related to each other and to the principal components.
+
+```{r, figures11, fig.show="hold", out.width="50%"}
+# label by location 
+plot(pr.out$x[,1],pr.out$x[,2]) # scatter plot for first two principal components
+text(pr.out$x[,1],pr.out$x[,2], Proj_data_MA334_Y00$Location, cex=0.4, pos=4, col="red") # location labels
+
+# label by eco increase 
+plot(pr.out$x[,1],pr.out$x[,2]) # scatter plot for first two principal components
+BD_inc  <- Proj_data_MA334_Y00$eco_status_7-Proj_data_MA334_Y70$eco_status_7 # BD differences between the two periods 
+text(pr.out$x[,1],pr.out$x[,2], round(BD_inc,2), cex=0.4, pos=4, col="red") # location labels
+
+
+```
+
+
+
+```{r, figures12, fig.show="hold", out.width="50%"}
+# label by a particular taxi group (if any) dominant in the first PC 
+eco_selected <- c(3,2,5,6,7,8,12) # an example Bees !
+eco_difference <- Proj_data_MA334_Y00[,eco_selected ]-Proj_data_MA334_Y70[,eco_selected ] # general differences between the two periods 
+pr.out=prcomp(na.omit(eco_difference)) # Principal Components 
+pr.out$rotation[,1:2] # print out first two principal axes
+screeplot(pr.out, type="lines") # plot the variances in decreasing order
+plot(pr.out$x[,1],pr.out$x[,2]) # scatter plot for first two principal components
+text(pr.out$x[,1],pr.out$x[,2], round(eco_difference$Bees,2), cex=0.5, pos=4, col="red") # location labels
+
+```
+
+### Conclusion
+In conclusion, this report presents findings from a study on biodiversity and ecological status using statistical methods. The data exploration section showed that bird taxonomy has the highest biodiversity, while bees have the lowest. The hypothesis tests showed a significant change in ecological status for BD7 between Y00 and Y70, but no significant difference between the distribution of BD7 and BD11. The linear regression models suggested a strong positive relationship between BD7 and BD11, as well as between BD7 and ecological status for both Y00 and Y70. The models were statistically significant, indicating a strong impact of predictor variables on the response variable. These findings have important implications for understanding the relationship between biodiversity and ecological status and can inform conservation efforts to protect vulnerable species and ecosystems.
