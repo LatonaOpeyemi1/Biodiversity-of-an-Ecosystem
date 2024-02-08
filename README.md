@@ -8,7 +8,7 @@ We conducted exploratory data analysis, hypothesis testing, and linear regressio
 ## Result
 The analysis showcased the varying levels of biodiversity across taxonomic groups and identified significant changes over time. Linear regression revealed strong positive relationships between biodiversity and ecological status. The findings provide valuable insights into ecosystem health and inform conservation strategies.
 
-For detailed results and interpretations, please refer to the complete analysis.
+For detailed results and interpretations, please refer to the complete analysis at https://rpubs.com/Opeyemi/1146539
 
 ## Conclusion
 Understanding biodiversity dynamics is crucial for effective ecosystem management. This analysis highlights key findings regarding biodiversity levels, changes over time, and relationships with ecological status. These insights can guide conservation efforts to preserve biodiversity and promote ecosystem resilience.
